@@ -1,5 +1,6 @@
 import streamlit as st
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
@@ -192,6 +193,52 @@ with tabs[1]:
         "every bounded $\\{w_t\\}$ if and only if $|\\phi| < 1$."
     )
 
+    # ── Worked example ─────────────────────────────────────────────────────
+    st.subheader("Worked Example — The Output Gap")
+    st.markdown(
+        "Macroeconomists model the **output gap** $\\tilde{y}_t$ "
+        "(% deviation of real GDP from potential) as a first-order autoregression. "
+        "A negative shock $\\varepsilon_t$ represents a sudden demand shortfall — a recession."
+    )
+    st.latex(r"\tilde{y}_t = 0.85\,\tilde{y}_{t-1} + \varepsilon_t")
+
+    col_oe1, col_oe2 = st.columns([1, 1], gap="large")
+    with col_oe1:
+        phi_oe = 0.85
+        shock_oe = -3.0
+        n_oe = 10
+        hl_oe = -np.log(2) / np.log(phi_oe)
+        rows_oe = {
+            "Quarter j": list(range(n_oe)),
+            "Multiplier  φ^j": [round(phi_oe**j, 4) for j in range(n_oe)],
+            "Gap  φ^j × (−3%)": [round(phi_oe**j * shock_oe, 3) for j in range(n_oe)],
+        }
+        st.dataframe(pd.DataFrame(rows_oe), hide_index=True, use_container_width=True)
+        st.markdown(
+            f"- **Half-life ≈ {hl_oe:.1f} quarters** — time for half the gap to close\n"
+            f"- **Long-run multiplier** (permanent shock): $1/(1-0.85) = {1/(1-phi_oe):.2f}$\n"
+            "- Because |φ| = 0.85 < 1 the economy heals **without intervention**"
+        )
+
+    with col_oe2:
+        yvals_oe = [phi_oe**j * shock_oe for j in range(n_oe)]
+        fig_oe = go.Figure()
+        fig_oe.add_trace(go.Bar(
+            x=list(range(n_oe)),
+            y=yvals_oe,
+            marker_color=["crimson" if v < 0 else "steelblue" for v in yvals_oe],
+        ))
+        fig_oe.add_hline(y=0, line_color="gray", line_dash="dash")
+        fig_oe.update_layout(
+            title="Output gap after a −3 pp recession shock  (φ = 0.85)",
+            xaxis_title="Quarters after shock  j",
+            yaxis_title="Output gap (%)",
+            height=340,
+            showlegend=False,
+            margin=dict(l=10, r=10, t=45, b=20),
+        )
+        st.plotly_chart(fig_oe, use_container_width=True)
+
     st.divider()
 
     # ── Interactive explorer ───────────────────────────────────────────────
@@ -362,6 +409,98 @@ with tabs[2]:
         "where the constants $c_i$ are determined by initial conditions. "
         "Complex conjugate eigenvalue pairs produce oscillatory (cyclical) behaviour."
     )
+
+    # ── Worked example ─────────────────────────────────────────────────────
+    st.subheader("Worked Example — Samuelson's Multiplier-Accelerator (1939)")
+    st.markdown(
+        "Paul Samuelson showed that a simple model of national income — combining "
+        "a **consumption multiplier** and an **investment accelerator** — produces "
+        "a 2nd-order difference equation. Its stability is decided entirely by "
+        "the companion matrix."
+    )
+
+    col_sa, col_sb = st.columns(2, gap="large")
+    with col_sa:
+        st.markdown("**Setup**")
+        st.latex(r"Y_t = C_t + I_t + G \quad \text{(income identity)}")
+        st.latex(r"C_t = c\,Y_{t-1} \quad \text{(MPC } c \text{, consumption lag)}")
+        st.latex(r"I_t = v\,(C_t - C_{t-1}) \quad \text{(accelerator } v \text{)}")
+        st.markdown("Substituting $C_t$ and $I_t$:")
+        st.latex(r"Y_t = \underbrace{c(1+v)}_{\phi_1}\,Y_{t-1} \underbrace{-\,cv}_{\phi_2}\,Y_{t-2} + G")
+        st.info(
+            "The economy's stability is entirely determined by whether the eigenvalues "
+            "of the companion matrix $\\mathbf{F}$ lie inside the unit circle — "
+            "a direct application of Proposition 1.2."
+        )
+
+    with col_sb:
+        st.markdown("**Samuelson's four cases** (for varying $c$ and $v$):")
+        cases = pd.DataFrame({
+            "Case": ["Damped convergence", "Damped cycles", "Sustained cycles", "Explosive cycles"],
+            "Example (c, v)": ["(0.5, 0.2)", "(0.8, 0.5)", "(1.0, 1.0)", "(0.9, 1.5)"],
+            "φ₁ = c(1+v)": [0.6, 1.2, 2.0, 2.25],
+            "φ₂ = −cv": [-0.10, -0.40, -1.00, -1.35],
+            "Stable?": ["✅ Yes", "✅ Yes", "⚠️ Border", "❌ No"],
+        })
+        st.dataframe(cases, hide_index=True, use_container_width=True)
+
+    st.markdown("**Try it yourself** — choose $c$ and $v$ and watch the economy respond:")
+
+    col_s1, col_s2 = st.columns([1, 2], gap="large")
+    with col_s1:
+        c_sam = st.slider("MPC  c", 0.10, 0.99, 0.80, 0.01, key="c_sam")
+        v_sam = st.slider("Accelerator  v", 0.0, 2.5, 0.50, 0.05, key="v_sam")
+        G_sam = st.number_input("Government spending  G", value=10.0, key="G_sam")
+        T_sam = st.slider("Periods", 20, 100, 60, key="T_sam")
+
+        phi1_s = c_sam * (1 + v_sam)
+        phi2_s = -c_sam * v_sam
+        st.latex(rf"\phi_1 = {phi1_s:.3f}, \quad \phi_2 = {phi2_s:.3f}")
+
+        F_sam = np.array([[phi1_s, phi2_s], [1.0, 0.0]])
+        eigs_sam = np.linalg.eigvals(F_sam)
+        stable_sam = all(abs(e) < 1 for e in eigs_sam)
+        for i, e in enumerate(eigs_sam):
+            sign = "+" if e.imag >= 0 else "−"
+            st.latex(
+                rf"\lambda_{{{i+1}}} = {e.real:.3f} {sign} {abs(e.imag):.3f}i,"
+                rf"\; |\lambda| = {abs(e):.3f}"
+            )
+        if stable_sam:
+            Y_ss = G_sam / (1 - c_sam)
+            st.success(f"**Stable** — converges to $Y^* = G/(1-c) = {Y_ss:.1f}$")
+        else:
+            st.error("**Unstable** — national income diverges")
+
+    with col_s2:
+        Y_sam = np.zeros(T_sam)
+        Y_sam[0] = G_sam
+        if T_sam > 1:
+            Y_sam[1] = phi1_s * Y_sam[0] + G_sam
+        for t in range(2, T_sam):
+            Y_sam[t] = phi1_s * Y_sam[t - 1] + phi2_s * Y_sam[t - 2] + G_sam
+
+        fig_sam = go.Figure()
+        fig_sam.add_trace(go.Scatter(
+            x=list(range(T_sam)), y=Y_sam,
+            mode="lines", line=dict(color="royalblue", width=2),
+        ))
+        if stable_sam:
+            Y_ss = G_sam / (1 - c_sam)
+            fig_sam.add_hline(
+                y=Y_ss, line_dash="dash", line_color="green",
+                annotation_text=f"Steady state Y* = {Y_ss:.1f}",
+                annotation_position="right",
+            )
+        fig_sam.update_layout(
+            title=f"National income path  (c = {c_sam}, v = {v_sam})",
+            xaxis_title="Period",
+            yaxis_title="Y_t",
+            height=380,
+            showlegend=False,
+            margin=dict(l=10, r=10, t=45, b=20),
+        )
+        st.plotly_chart(fig_sam, use_container_width=True)
 
     st.divider()
     st.subheader("Interactive: $p$th-Order Explorer")
@@ -570,6 +709,125 @@ with tabs[3]:
         "Unlike the stable case, no long-run mean exists: the process wanders "
         "without a fixed centre. This motivates the extensive treatment of "
         "**unit-root tests** in Chapters 15–18."
+    )
+
+    # ── Worked examples ────────────────────────────────────────────────────
+    st.subheader("Worked Examples — Three Processes, Three Regimes")
+    st.markdown(
+        "The table below maps the three theoretical regimes to familiar "
+        "economic and financial time series."
+    )
+
+    eg_tbl = pd.DataFrame({
+        "Regime": ["$|\\phi| < 1$ — Stable", "$\\phi = 1$ — Unit Root", "$|\\phi| > 1$ — Explosive"],
+        "Typical φ": ["0.7 – 0.95", "1.0", "> 1"],
+        "Real-world series": [
+            "Interest rates, inflation deviations, output gap",
+            "Stock prices, GDP levels, exchange rates",
+            "Hyperinflation, asset bubbles",
+        ],
+        "Key property": [
+            "Mean-reverting; shocks are transitory",
+            "Variance grows without bound; shocks are permanent",
+            "Diverges; dominated by initial conditions",
+        ],
+    })
+    st.dataframe(eg_tbl, hide_index=True, use_container_width=True)
+
+    st.markdown("#### Stock Prices — Why the Random Walk Matters")
+    st.markdown(
+        "Eugene Fama's **Efficient Market Hypothesis** (EMH) implies that stock "
+        "prices should follow a random walk ($\\phi = 1$). If prices were "
+        "mean-reverting ($\\phi < 1$), traders could profit by betting on "
+        "reversion — but that trading itself would eliminate the pattern."
+    )
+
+    col_rw1, col_rw2 = st.columns(2, gap="large")
+    with col_rw1:
+        st.latex(r"P_t = P_{t-1} + \varepsilon_t, \quad \varepsilon_t \sim \mathcal{N}(0,\sigma^2)")
+        st.latex(r"\operatorname{Var}(P_t) = t\,\sigma^2 \quad \xrightarrow{t\to\infty} \infty")
+        st.markdown(
+            "- **Today's price is the best forecast of tomorrow's price** — "
+            "no trend, no reversion\n"
+            "- Initial price $P_0$ is *never* forgotten — it shifts every future path\n"
+            "- 95% confidence band widens as $\\pm 1.96\\,\\sigma\\sqrt{t}$"
+        )
+
+    with col_rw2:
+        np.random.seed(2024)
+        T_rw = 120
+        sigma_rw = 1.0
+        n_paths = 6
+        P0 = 100.0
+        colors_rw = px.colors.qualitative.Pastel
+
+        fig_rw = go.Figure()
+        for k in range(n_paths):
+            eps = np.random.normal(0, sigma_rw, T_rw)
+            path = P0 + np.cumsum(eps)
+            fig_rw.add_trace(go.Scatter(
+                x=list(range(T_rw)), y=path.tolist(),
+                mode="lines", line=dict(width=1, color=colors_rw[k % len(colors_rw)]),
+                opacity=0.8, showlegend=False,
+            ))
+        # ±1.96σ√t band
+        t_arr = np.arange(1, T_rw + 1)
+        band = 1.96 * sigma_rw * np.sqrt(t_arr)
+        fig_rw.add_trace(go.Scatter(
+            x=list(range(T_rw)) + list(range(T_rw - 1, -1, -1)),
+            y=(P0 + band).tolist() + (P0 - band[::-1]).tolist(),
+            fill="toself", fillcolor="rgba(180,180,180,0.2)",
+            line=dict(color="gray", dash="dot"), name="95% band",
+        ))
+        fig_rw.add_hline(y=P0, line_dash="dash", line_color="black",
+                         annotation_text="P₀ = 100")
+        fig_rw.update_layout(
+            title="Random walk — 6 simulated stock-price paths (σ = 1)",
+            xaxis_title="Trading days",
+            yaxis_title="Price",
+            height=340,
+            showlegend=False,
+            margin=dict(l=10, r=10, t=45, b=20),
+        )
+        st.plotly_chart(fig_rw, use_container_width=True)
+
+    st.markdown("#### Contrast — Mean-Reverting Interest Rate  ($\\phi = 0.9$)")
+    st.markdown(
+        "Short-term interest rates are often modelled as stationary AR(1) processes "
+        "that gravitate back to a long-run level $\\mu$:"
+    )
+    st.latex(r"r_t - \mu = \phi\,(r_{t-1} - \mu) + \varepsilon_t, \quad \phi = 0.9, \;\mu = 5\%")
+
+    np.random.seed(77)
+    T_ir = 120
+    mu_ir = 5.0
+    phi_ir = 0.9
+    eps_ir = np.random.normal(0, 0.3, T_ir)
+    r_ir = np.zeros(T_ir)
+    r_ir[0] = 8.0  # start away from mean to show reversion
+    for t in range(1, T_ir):
+        r_ir[t] = mu_ir + phi_ir * (r_ir[t - 1] - mu_ir) + eps_ir[t]
+
+    fig_ir = go.Figure()
+    fig_ir.add_trace(go.Scatter(
+        x=list(range(T_ir)), y=r_ir.tolist(),
+        mode="lines", line=dict(color="darkorange", width=2), name="r_t",
+    ))
+    fig_ir.add_hline(y=mu_ir, line_dash="dash", line_color="green",
+                     annotation_text=f"Long-run mean μ = {mu_ir}%",
+                     annotation_position="right")
+    fig_ir.update_layout(
+        title="Mean-reverting interest rate (φ = 0.9, starts at 8% — above long-run level)",
+        xaxis_title="Month",
+        yaxis_title="Interest rate (%)",
+        height=300,
+        showlegend=False,
+        margin=dict(l=10, r=10, t=45, b=20),
+    )
+    st.plotly_chart(fig_ir, use_container_width=True)
+    st.markdown(
+        f"Half-life: $-\\ln 2 / \\ln 0.9 \\approx {-np.log(2)/np.log(0.9):.1f}$ months "
+        "for deviations from $\\mu$ to halve — very different from the random walk above."
     )
 
     st.divider()
